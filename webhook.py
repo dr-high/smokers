@@ -9,7 +9,7 @@ load_dotenv()
 # Telegram Bot Details
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_BOT_TOKEN = os.getenv("ADMIN_BOT_TOKEN")  # Second bot for admin notifications
-ADMIN_CHAT_ID = "6009484587"  # Replace with your actual Telegram ID
+ADMIN_CHAT_ID = "6951028293"  # Replace with your actual Telegram ID
 
 # Flask App
 app = Flask(__name__)
