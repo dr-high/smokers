@@ -84,8 +84,9 @@ def paystack_webhook():
         print("🔔 Sending admin message to Discord...")  # Debugging
         send_discord_message(admin_message)
         print("✅ Admin notification sent to Discord!")  # Debugging
-        
-    print("✅ Admin notification sent to Discord!")  # Debugging
+
+    print(f"✅ Payment Processed: {reference} | Amount: {amount} | Status: {status}")
+    return "Webhook processed successfully", 200
 
                 print(f"✅ Payment Processed: {reference} | Amount: {amount} | Status: {status}")
                 return "Webhook processed successfully", 200
