@@ -1,154 +1,65 @@
 import os
-import traceback
 import json
-from flask import Flask, request, redirect
-import requests
+import sqlite3
+import traceback
+from flask import Flask, request
+
 from dotenv import load_dotenv
+import requests
 
 load_dotenv()
-
-# Telegram Bot Details
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-# Flask App
-app = Flask(__name__)
-
-# Paystack Secret Key (for verifying transactions)
 PAYSTACK_SECRET_KEY = os.getenv("PAYSTACK_SECRET_KEY")
 
-def send_telegram_message(chat_id, message):
-    """Send a message to a Telegram user."""
-    TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+app = Flask(__name__)
 
-    payload = {
-        "chat_id": chat_id,
-        "text": message,
-        "parse_mode": "Markdown"
-    }
-
-    try:
-        response = requests.post(TELEGRAM_API_URL, json=payload)
-        if response.status_code == 200:
-            print("✅ Telegram message sent successfully!")
-        else:
-            print(f"❌ Telegram Error: {response.status_code}, {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Telegram Request Failed: {e}")
-
-# Webhook Route
-@app.route("/paystack_webhook", methods=["POST", "GET"])
+@app.route("/paystack_webhook", methods=["POST"])
 def paystack_webhook():
     try:
-        print("✅ Webhook received!")
+        data = request.get_json()
+        if not data:
+            return "Invalid Data", 400
 
-        if request.method == "GET":
-            reference = request.args.get("reference", "No reference provided")
-            print(f"🔍 Received GET request. Reference: {reference}")
+        reference = data["data"].get("reference", "No reference")
+        amount = data["data"].get("amount", 0) / 100
+        status = data["data"].get("status", "unknown")
+        user_id = data["data"]["metadata"].get("user_id", "unknown")
+        address = data["data"]["metadata"].get("address", "No address")
+        phone = data["data"]["metadata"].get("phone", "No phone")
 
-            payment_verified, amount, status, user_id = verify_paystack_payment(reference)
-            print(f"✅ Verification Result: {payment_verified}, {amount}, {status}, {user_id}")
-
-            if payment_verified:
-                user_message = f"🎉 *Payment Successful!*\n\n💰 Amount: GHS {amount}\n✅ Status: {status}\n🔗 Reference: `{reference}`"
-                send_telegram_message(user_id, user_message)
-
-                telegram_redirect_url = f"https://t.me/drhighspecialBot?start=payment_{reference}"
-                return redirect(telegram_redirect_url, code=302)
-            else:
-                print("❌ Payment verification failed.")
-                return "Payment verification failed. Please contact support.", 400
-
-        elif request.method == "POST":
-            data = request.get_json()
-            if not data:
-                print("❌ Received empty POST request!")
-                return "Invalid Data", 400
-
-            reference = data["data"].get("reference", "No reference")
-            amount = data["data"].get("amount", 0) / 100
-            status = data["data"].get("status", "unknown")
-            user_id = data["data"]["metadata"].get("user_id", "unknown")
-
-            print(f"🔍 Received POST request. Reference: {reference}, Amount: {amount}, Status: {status}, User ID: {user_id}")
-
-            payment_verified, amount, status, user_id = verify_paystack_payment(reference)
-            if payment_verified:
-                # ✅ Debugging: Print verification success
-                print(f"✅ Payment Verified: {reference} | Amount: {amount} | Status: {status} | User ID: {user_id}")
-
-                # ✅ Notify Admin using Discord Webhook (Check if user_id is valid)
-                if user_id == "unknown":
-                    print("⚠️ User ID missing in metadata! Skipping Discord notification.")
-                else:
-                    admin_message = (
-                        f"🚀 **New Payment Received!**\n\n"
-                        f"👤 **User ID:** {user_id}\n"
-                        f"💰 **Amount:** GHS {amount}\n"
-                        f"✅ **Status:** {status}\n"
-                        f"🔗 **Reference:** `{reference}`"
-                    )
-
-                    print("🔔 Sending admin message to Discord...")  # Debugging
-                    send_discord_message(admin_message)
-                    print("✅ Admin notification sent to Discord!")  # Debugging
-
-                print(f"✅ Payment Processed: {reference} | Amount: {amount} | Status: {status}")
-                return "Webhook processed successfully", 200
-            else:
-                print("❌ Payment verification failed.")
-                return "Payment verification failed", 400
+        payment_verified, amount, status, user_id = verify_paystack_payment(reference)
+        if payment_verified:
+            save_order(user_id, reference, amount, address, phone, status)
+            return "Webhook processed successfully", 200
+        else:
+            return "Payment verification failed", 400
 
     except Exception as e:
-        print("❌ ERROR in paystack_webhook():", str(e))
-        traceback.print_exc()  # Prints the full error traceback
+        traceback.print_exc()
         return "Internal Server Error", 500
 
-@app.route("/", methods=["GET"])
-def home():
-    return "Webhook is running!", 200
-
-def send_discord_message(message):
-    """Send payment notifications to Discord webhook."""
-    DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
-
-    if not DISCORD_WEBHOOK_URL:
-        print("❌ Discord Webhook URL is missing!")
-        return False
-
-    data = {"content": message}  # Message to send
-
-    try:
-        response = requests.post(DISCORD_WEBHOOK_URL, json=data)
-        if response.status_code == 204:  # Discord returns 204 No Content on success
-            print("✅ Discord message sent successfully!")
-            return True
-        else:
-            print(f"❌ Discord Error: {response.status_code}, {response.text}")
-            return False
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Discord Request Failed: {e}")
-        return False
+def save_order(user_id, reference, amount, address, phone, status):
+    conn = sqlite3.connect("store.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO orders (user_id, reference, amount, address, phone, status)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (user_id, reference, amount, address, phone, status))
+    conn.commit()
+    conn.close()
 
 def verify_paystack_payment(reference):
-    """Verify transaction with Paystack API before confirming it."""
     url = f"https://api.paystack.co/transaction/verify/{reference}"
     headers = {"Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"}
 
-    try:
-        response = requests.get(url, headers=headers)
-        response_json = response.json()
+    response = requests.get(url, headers=headers)
+    response_json = response.json()
 
-        if response.status_code == 200 and response_json.get("status") and response_json["data"]["status"] == "success":
-            amount = response_json["data"]["amount"] / 100  # Convert kobo to GHS
-            user_id = response_json["data"]["metadata"].get("user_id", "unknown")
-            return True, amount, "success", user_id
-        else:
-            return False, 0, "failed", "unknown"
+    if response.status_code == 200 and response_json.get("status") and response_json["data"]["status"] == "success":
+        amount = response_json["data"]["amount"] / 100
+        user_id = response_json["data"]["metadata"].get("user_id", "unknown")
+        return True, amount, "success", user_id
+    return False, 0, "failed", "unknown"
 
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Paystack Verification Failed: {e}")
-        return False, 0, "failed", "unknown"
-
-# Run Flask App
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
