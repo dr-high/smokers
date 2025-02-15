@@ -13,31 +13,34 @@ CHAT_ID = "6009484587"  # Replace with your Telegram ID
 # Flask App
 app = Flask(__name__)
 
-# Webhook Route (EXPLICITLY allowing only POST)
-@app.route("/paystack_webhook", methods=["POST"])
+# Webhook Route (Accepting Both GET & POST)
+@app.route("/paystack_webhook", methods=["POST", "GET"])
 def paystack_webhook():
-    if request.method != "POST":
-        return "Method Not Allowed", 405  # Explicitly return error for non-POST requests
+    if request.method == "GET":
+        # Handle GET request (User redirect after payment)
+        reference = request.args.get("reference", "No reference provided")
+        return f"Payment completed! Reference: {reference}", 200
 
-    data = request.get_json()
-    if not data:
-        return "Invalid Data", 400
+    elif request.method == "POST":
+        # Handle Paystack's payment notification
+        data = request.get_json()
+        if not data:
+            return "Invalid Data", 400
 
-    # Extract details
-    event = data.get("event", "")
-    amount = data["data"].get("amount", 0) / 100  # Convert kobo to GHS
-    status = data["data"].get("status", "unknown")
-    user_id = data["data"]["metadata"].get("user_id", "unknown")
+        event = data.get("event", "")
+        amount = data["data"].get("amount", 0) / 100  # Convert kobo to GHS
+        status = data["data"].get("status", "unknown")
+        user_id = data["data"]["metadata"].get("user_id", "unknown")
 
-    # Notify Admin via Telegram
-    message = f"🚀 *Paystack Payment Received!*\n\n👤 User ID: {user_id}\n💰 Amount: GHS {amount}\n✅ Status: {status}"
-    send_telegram_message(message)
+        # Notify Admin via Telegram
+        message = f"🚀 *Paystack Payment Received!*\n\n👤 User ID: {user_id}\n💰 Amount: GHS {amount}\n✅ Status: {status}"
+        send_telegram_message(message)
 
-    return "Webhook received successfully", 200
+        return "Webhook received successfully", 200
 
 @app.route("/", methods=["GET"])
 def home():
-    return "Webhook is running!", 200  # Simple homepage for testing
+    return "Webhook is running!", 200
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -46,4 +49,4 @@ def send_telegram_message(message):
 
 # Run Flask App
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=8080)
