@@ -62,9 +62,10 @@ def paystack_webhook():
 def home():
     return "Webhook is running!", 200
 
-def send_telegram_message(chat_id, message):
-    """Send message to Telegram."""
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+def send_telegram_message(chat_id, message, use_admin_bot=False):
+    """Send message to Telegram. Uses admin bot if specified."""
+    bot_token = os.getenv("BOT_TOKEN") if not use_admin_bot else os.getenv("ADMIN_BOT_TOKEN")
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     data = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
     
     try:
