@@ -79,7 +79,13 @@ def paystack_webhook():
     if user_id == "unknown":
         print("⚠️ User ID missing in metadata! Skipping Discord notification.")
     else:
-        admin_message = "🚀 **New Payment Received!**\n\n👤 **User ID:** {}\n💰 **Amount:** GHS {}\n✅ **Status:** {}\n🔗 **Reference:** `{}`".format(user_id, amount, status, reference)
+        admin_message = (
+            f"🚀 **New Payment Received!**\n\n"
+            f"👤 **User ID:** {user_id}\n"
+            f"💰 **Amount:** GHS {amount}\n"
+            f"✅ **Status:** {status}\n"
+            f"🔗 **Reference:** `{reference}`"
+        )
 
         print("🔔 Sending admin message to Discord...")  # Debugging
         send_discord_message(admin_message)
