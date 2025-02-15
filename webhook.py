@@ -17,16 +17,9 @@ app = Flask(__name__)
 @app.route("/paystack_webhook", methods=["POST"])
 def paystack_webhook():
     data = request.get_json()
+    
     if not data:
         return "Invalid Data", 400
-
-    # Verify Paystack signature (Optional but recommended)
-    paystack_secret = "sk_test_2ab162c82e50d96fa701b593bc72689be1d17456"
-    received_signature = request.headers.get("X-Paystack-Signature")
-    expected_signature = paystack_secret  # For simplicity, we're not hashing, but you should verify it.
-
-    if received_signature != expected_signature:
-        return "Unauthorized", 401
 
     # Extract necessary details
     event = data.get("event")
@@ -38,7 +31,11 @@ def paystack_webhook():
     message = f"🚀 *Paystack Payment Received!*\n\n👤 User ID: {user_id}\n💰 Amount: GHS {amount}\n✅ Status: {status}"
     send_telegram_message(message)
 
-    return "Webhook received", 200
+    return "Webhook received successfully", 200
+
+@app.route("/")
+def home():
+    return "Webhook is running!", 200  # Simple homepage for testing
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
