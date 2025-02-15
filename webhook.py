@@ -18,48 +18,61 @@ PAYSTACK_SECRET_KEY = os.getenv("PAYSTACK_SECRET_KEY")
 # Webhook Route
 @app.route("/paystack_webhook", methods=["POST", "GET"])
 def paystack_webhook():
-    if request.method == "GET":
-        # Paystack redirects user after payment
-        reference = request.args.get("reference", "No reference provided")
+    try:
+        if request.method == "GET":
+            # Paystack redirects user after payment
+            reference = request.args.get("reference", "No reference provided")
 
-        # ✅ Step 1: Verify Payment Before Redirecting
-        payment_verified, amount, status, user_id = verify_paystack_payment(reference)
+            print(f"Received GET request. Reference: {reference}")  # Log reference
 
-        if payment_verified:
-            # ✅ Step 2: Notify the user about successful payment
-            user_message = f"🎉 *Payment Successful!*\n\n💰 Amount: GHS {amount}\n✅ Status: {status}\n🔗 Reference: `{reference}`"
-            send_telegram_message(user_id, user_message)
+            # ✅ Step 1: Verify Payment Before Redirecting
+            payment_verified, amount, status, user_id = verify_paystack_payment(reference)
 
-            # ✅ Step 3: Redirect User to Telegram Bot with a Success Message
-            telegram_redirect_url = f"https://t.me/drhighspecialBot?start=payment_{reference}"
-            return redirect(telegram_redirect_url, code=302)
-        else:
-            return "Payment verification failed. Please contact support.", 400
+            print(f"Verification Status: {payment_verified}, Amount: {amount}, Status: {status}, User ID: {user_id}")
 
-    elif request.method == "POST":
-        # Paystack sends a POST request with transaction details
-        data = request.get_json()
-        if not data:
-            return "Invalid Data", 400
+            if payment_verified:
+                # ✅ Step 2: Notify the user about successful payment
+                user_message = f"🎉 *Payment Successful!*\n\n💰 Amount: GHS {amount}\n✅ Status: {status}\n🔗 Reference: `{reference}`"
+                send_telegram_message(user_id, user_message)
 
-        # Extract details
-        reference = data["data"].get("reference", "No reference")
-        amount = data["data"].get("amount", 0) / 100  # Convert kobo to GHS
-        status = data["data"].get("status", "unknown")
-        user_id = data["data"]["metadata"].get("user_id", "unknown")
+                # ✅ Step 3: Redirect User to Telegram Bot with a Success Message
+                telegram_redirect_url = f"https://t.me/drhighspecialBot?start=payment_{reference}"
+                return redirect(telegram_redirect_url, code=302)
+            else:
+                return "Payment verification failed. Please contact support.", 400
 
-        # ✅ Verify Payment Before Notifying Admin
-        payment_verified, amount, status, user_id = verify_paystack_payment(reference)
+        elif request.method == "POST":
+            # Paystack sends a POST request with transaction details
+            data = request.get_json()
+            if not data:
+                return "Invalid Data", 400
 
-        if payment_verified:
-            # ✅ Notify Admin using Discord Webhook
-            admin_message = "🚀 **New Payment Received!**\n\n👤 **User ID:** {}\n💰 **Amount:** GHS {}\n✅ **Status:** {}\n🔗 **Reference:** `{}`".format(user_id, amount, status, reference)
-            send_discord_message(admin_message)  # Ensure this function exists and is properly defined
+            print(f"Received POST request: {json.dumps(data, indent=4)}")  # Log received data
 
-            # ✅ Log Event
-            print(f"✅ Payment Processed: {reference} | Amount: {amount} | Status: {status}")
+            # Extract details
+            reference = data["data"].get("reference", "No reference")
+            amount = data["data"].get("amount", 0) / 100  # Convert kobo to GHS
+            status = data["data"].get("status", "unknown")
+            user_id = data["data"]["metadata"].get("user_id", "unknown")
 
-        return "Webhook processed successfully", 200
+            # ✅ Verify Payment Before Notifying Admin
+            payment_verified, amount, status, user_id = verify_paystack_payment(reference)
+
+            print(f"Payment Verified: {payment_verified}, Amount: {amount}, Status: {status}, User ID: {user_id}")
+
+            if payment_verified:
+                # ✅ Notify Admin using Discord Webhook
+                admin_message = f"🚀 **New Payment Received!**\n\n👤 **User ID:** {user_id}\n💰 **Amount:** GHS {amount}\n✅ **Status:** {status}\n🔗 **Reference:** `{reference}`"
+                send_discord_message(admin_message)
+
+                # ✅ Log Event
+                print(f"✅ Payment Processed: {reference} | Amount: {amount} | Status: {status}")
+
+            return "Webhook processed successfully", 200
+
+    except Exception as e:
+        print(f"❌ ERROR: {str(e)}")  # Log error message
+        return "Internal Server Error", 500  # Return error response
 
 @app.route("/", methods=["GET"])
 def home():
