@@ -72,11 +72,19 @@ def paystack_webhook():
 
             payment_verified, amount, status, user_id = verify_paystack_payment(reference)
             if payment_verified:
-    # ✅ Notify Admin using Discord Webhook
-    admin_message = "🚀 **New Payment Received!**\n\n👤 **User ID:** {}\n💰 **Amount:** GHS {}\n✅ **Status:** {}\n🔗 **Reference:** `{}`".format(user_id, amount, status, reference)
-    
-    print("🔔 Sending admin message to Discord...")  # Debugging
-    send_discord_message(admin_message)
+    # ✅ Debugging: Print verification success
+    print(f"✅ Payment Verified: {reference} | Amount: {amount} | Status: {status} | User ID: {user_id}")
+
+    # ✅ Notify Admin using Discord Webhook (Check if user_id is valid)
+    if user_id == "unknown":
+        print("⚠️ User ID missing in metadata! Skipping Discord notification.")
+    else:
+        admin_message = "🚀 **New Payment Received!**\n\n👤 **User ID:** {}\n💰 **Amount:** GHS {}\n✅ **Status:** {}\n🔗 **Reference:** `{}`".format(user_id, amount, status, reference)
+        
+        print("🔔 Sending admin message to Discord...")  # Debugging
+        send_discord_message(admin_message)
+        print("✅ Admin notification sent to Discord!")  # Debugging
+        
     print("✅ Admin notification sent to Discord!")  # Debugging
 
                 print(f"✅ Payment Processed: {reference} | Amount: {amount} | Status: {status}")
