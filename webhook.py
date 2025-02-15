@@ -9,7 +9,7 @@ load_dotenv()
 # Telegram Bot Details
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_BOT_TOKEN = os.getenv("ADMIN_BOT_TOKEN")  # Second bot for admin notifications
-ADMIN_CHAT_ID = "6951028293"  # Replace with your actual Telegram ID
+ADMIN_CHAT_ID = "6009484587"  # Replace with your actual Telegram ID
 
 # Flask App
 app = Flask(__name__)
@@ -74,9 +74,6 @@ def send_telegram_message(chat_id, message, use_admin_bot=False):
     bot_token = ADMIN_BOT_TOKEN if use_admin_bot else BOT_TOKEN
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     data = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
-
-    print(f"🔍 Sending Telegram Message to {chat_id}: {message}")  # Debugging
-    print(f"🔍 Using bot token: {bot_token[:10]}...")  # Print partial token to check if it's loading
     
     try:
         response = requests.post(url, json=data)
@@ -86,7 +83,7 @@ def send_telegram_message(chat_id, message, use_admin_bot=False):
             print("✅ Telegram message sent successfully!")
             return True
         else:
-            print(f"❌ Telegram Error: {response_json}")  # Debugging
+            print(f"❌ Telegram Error: {response_json}")
             return False
 
     except requests.exceptions.RequestException as e:
