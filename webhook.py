@@ -34,6 +34,7 @@ def send_telegram_message(chat_id, message):
             print(f"❌ Telegram Error: {response.status_code}, {response.text}")
     except requests.exceptions.RequestException as e:
         print(f"❌ Telegram Request Failed: {e}")
+
 # Webhook Route
 @app.route("/paystack_webhook", methods=["POST", "GET"])
 def paystack_webhook():
@@ -72,27 +73,24 @@ def paystack_webhook():
 
             payment_verified, amount, status, user_id = verify_paystack_payment(reference)
             if payment_verified:
-    # ✅ Debugging: Print verification success
-    print(f"✅ Payment Verified: {reference} | Amount: {amount} | Status: {status} | User ID: {user_id}")
+                # ✅ Debugging: Print verification success
+                print(f"✅ Payment Verified: {reference} | Amount: {amount} | Status: {status} | User ID: {user_id}")
 
-    # ✅ Notify Admin using Discord Webhook (Check if user_id is valid)
-    if user_id == "unknown":
-        print("⚠️ User ID missing in metadata! Skipping Discord notification.")
-    else:
-        admin_message = (
-            f"🚀 **New Payment Received!**\n\n"
-            f"👤 **User ID:** {user_id}\n"
-            f"💰 **Amount:** GHS {amount}\n"
-            f"✅ **Status:** {status}\n"
-            f"🔗 **Reference:** `{reference}`"
-        )
+                # ✅ Notify Admin using Discord Webhook (Check if user_id is valid)
+                if user_id == "unknown":
+                    print("⚠️ User ID missing in metadata! Skipping Discord notification.")
+                else:
+                    admin_message = (
+                        f"🚀 **New Payment Received!**\n\n"
+                        f"👤 **User ID:** {user_id}\n"
+                        f"💰 **Amount:** GHS {amount}\n"
+                        f"✅ **Status:** {status}\n"
+                        f"🔗 **Reference:** `{reference}`"
+                    )
 
-        print("🔔 Sending admin message to Discord...")  # Debugging
-        send_discord_message(admin_message)
-        print("✅ Admin notification sent to Discord!")  # Debugging
-
-    print(f"✅ Payment Processed: {reference} | Amount: {amount} | Status: {status}")
-    return "Webhook processed successfully", 200
+                    print("🔔 Sending admin message to Discord...")  # Debugging
+                    send_discord_message(admin_message)
+                    print("✅ Admin notification sent to Discord!")  # Debugging
 
                 print(f"✅ Payment Processed: {reference} | Amount: {amount} | Status: {status}")
                 return "Webhook processed successfully", 200
