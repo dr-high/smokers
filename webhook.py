@@ -13,19 +13,21 @@ CHAT_ID = "6009484587"  # Replace with your Telegram ID
 # Flask App
 app = Flask(__name__)
 
-# Webhook Route
+# Webhook Route (EXPLICITLY allowing only POST)
 @app.route("/paystack_webhook", methods=["POST"])
 def paystack_webhook():
+    if request.method != "POST":
+        return "Method Not Allowed", 405  # Explicitly return error for non-POST requests
+
     data = request.get_json()
-    
     if not data:
         return "Invalid Data", 400
 
-    # Extract necessary details
-    event = data.get("event")
-    amount = data["data"]["amount"] / 100  # Convert kobo to GHS
-    status = data["data"]["status"]
-    user_id = data["data"]["metadata"]["user_id"]
+    # Extract details
+    event = data.get("event", "")
+    amount = data["data"].get("amount", 0) / 100  # Convert kobo to GHS
+    status = data["data"].get("status", "unknown")
+    user_id = data["data"]["metadata"].get("user_id", "unknown")
 
     # Notify Admin via Telegram
     message = f"🚀 *Paystack Payment Received!*\n\n👤 User ID: {user_id}\n💰 Amount: GHS {amount}\n✅ Status: {status}"
@@ -33,7 +35,7 @@ def paystack_webhook():
 
     return "Webhook received successfully", 200
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def home():
     return "Webhook is running!", 200  # Simple homepage for testing
 
