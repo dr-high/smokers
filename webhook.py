@@ -54,9 +54,9 @@ def paystack_webhook():
         payment_verified, amount, status, user_id = verify_paystack_payment(reference)
 
         if payment_verified:
-            # ✅ Notify Admin using the second bot
-            admin_message = f"🚀 *New Payment Received!*\n\n👤 User ID: {user_id}\n💰 Amount: GHS {amount}\n✅ Status: {status}\n🔗 Reference: `{reference}`"
-            send_telegram_message(ADMIN_CHAT_ID, admin_message, use_admin_bot=True)
+    # ✅ Notify Admin via Discord
+    admin_message = f"🚀 **New Payment Received!**\n\n👤 **User ID:** {user_id}\n💰 **Amount:** GHS {amount}\n✅ **Status:** {status}\n🔗 **Reference:** `{reference}`"
+    send_discord_message(admin_message)
 
             # ✅ Log Event
             print(f"✅ Payment Processed: {reference} | Amount: {amount} | Status: {status}")
@@ -69,25 +69,26 @@ def paystack_webhook():
 def home():
     return "Webhook is running!", 200
 
-def send_telegram_message(chat_id, message, use_admin_bot=False):
-    """Send message to Telegram. Uses admin bot if specified."""
-    bot_token = ADMIN_BOT_TOKEN if use_admin_bot else BOT_TOKEN
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    data = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
-    
-    try:
-        response = requests.post(url, json=data)
-        response_json = response.json()
+def send_discord_message(message):
+    """Send payment notifications to Discord webhook."""
+    DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
-        if response.status_code == 200 and response_json.get("ok"):
-            print("✅ Telegram message sent successfully!")
+    if not DISCORD_WEBHOOK_URL:
+        print("❌ Discord Webhook URL is missing!")
+        return False
+
+    data = {"content": message}  # Message to send
+
+    try:
+        response = requests.post(DISCORD_WEBHOOK_URL, json=data)
+        if response.status_code == 204:  # Discord returns 204 No Content on success
+            print("✅ Discord message sent successfully!")
             return True
         else:
-            print(f"❌ Telegram Error: {response_json}")
+            print(f"❌ Discord Error: {response.status_code}, {response.text}")
             return False
-
     except requests.exceptions.RequestException as e:
-        print(f"❌ Telegram Request Failed: {e}")
+        print(f"❌ Discord Request Failed: {e}")
         return False
 
 def verify_paystack_payment(reference):
