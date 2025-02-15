@@ -8,6 +8,7 @@ load_dotenv()
 
 # Telegram Bot Details
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_BOT_TOKEN = os.getenv("ADMIN_BOT_TOKEN")  # Second bot for admin notifications
 ADMIN_CHAT_ID = "6009484587"  # Replace with your actual Telegram ID
 
 # Flask App
@@ -20,7 +21,7 @@ PAYSTACK_SECRET_KEY = os.getenv("PAYSTACK_SECRET_KEY")
 @app.route("/paystack_webhook", methods=["POST", "GET"])
 def paystack_webhook():
     if request.method == "GET":
-        # Paystack is redirecting user after payment
+        # Paystack redirects user after payment
         reference = request.args.get("reference", "No reference provided")
 
         # ✅ Step 1: Verify Payment Before Redirecting
@@ -28,8 +29,8 @@ def paystack_webhook():
 
         if payment_verified:
             # ✅ Step 2: Notify the user about successful payment
-            message = f"🎉 *Payment Successful!*\n\n💰 Amount: GHS {amount}\n✅ Status: {status}\n🔗 Reference: `{reference}`"
-            send_telegram_message(user_id, message)
+            user_message = f"🎉 *Payment Successful!*\n\n💰 Amount: GHS {amount}\n✅ Status: {status}\n🔗 Reference: `{reference}`"
+            send_telegram_message(user_id, user_message)
 
             # ✅ Step 3: Redirect User to Telegram Bot with a Success Message
             telegram_redirect_url = f"https://t.me/drhighspecialBot?start=payment_{reference}"
@@ -49,14 +50,20 @@ def paystack_webhook():
         status = data["data"].get("status", "unknown")
         user_id = data["data"]["metadata"].get("user_id", "unknown")
 
-        # ✅ Notify Admin
-        admin_message = f"🚀 *New Payment Received!*\n\n👤 User ID: {user_id}\n💰 Amount: GHS {amount}\n✅ Status: {status}\n🔗 Reference: `{reference}`"
-        send_telegram_message(ADMIN_CHAT_ID, admin_message)
+        # ✅ Verify Payment Before Notifying Admin
+        payment_verified, amount, status, user_id = verify_paystack_payment(reference)
 
-        # ✅ Log Event
-        print(f"✅ Payment Processed: {reference} | Amount: {amount} | Status: {status}")
+        if payment_verified:
+            # ✅ Notify Admin using the second bot
+            admin_message = f"🚀 *New Payment Received!*\n\n👤 User ID: {user_id}\n💰 Amount: GHS {amount}\n✅ Status: {status}\n🔗 Reference: `{reference}`"
+            send_telegram_message(ADMIN_CHAT_ID, admin_message, use_admin_bot=True)
 
-        return "Webhook processed successfully", 200
+            # ✅ Log Event
+            print(f"✅ Payment Processed: {reference} | Amount: {amount} | Status: {status}")
+
+            return "Webhook processed successfully", 200
+        else:
+            return "Payment verification failed", 400
 
 @app.route("/", methods=["GET"])
 def home():
@@ -64,7 +71,7 @@ def home():
 
 def send_telegram_message(chat_id, message, use_admin_bot=False):
     """Send message to Telegram. Uses admin bot if specified."""
-    bot_token = os.getenv("BOT_TOKEN") if not use_admin_bot else os.getenv("ADMIN_BOT_TOKEN")
+    bot_token = ADMIN_BOT_TOKEN if use_admin_bot else BOT_TOKEN
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     data = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
     
