@@ -16,6 +16,24 @@ app = Flask(__name__)
 # Paystack Secret Key (for verifying transactions)
 PAYSTACK_SECRET_KEY = os.getenv("PAYSTACK_SECRET_KEY")
 
+def send_telegram_message(chat_id, message):
+    """Send a message to a Telegram user."""
+    TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+
+    try:
+        response = requests.post(TELEGRAM_API_URL, json=payload)
+        if response.status_code == 200:
+            print("✅ Telegram message sent successfully!")
+        else:
+            print(f"❌ Telegram Error: {response.status_code}, {response.text}")
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Telegram Request Failed: {e}")
 # Webhook Route
 @app.route("/paystack_webhook", methods=["POST", "GET"])
 def paystack_webhook():
