@@ -54,14 +54,15 @@ def paystack_webhook():
         payment_verified, amount, status, user_id = verify_paystack_payment(reference)
 
         if payment_verified:
-    # ✅ Notify Admin via Discord
+    # ✅ Notify Admin using Discord Webhook
     admin_message = "🚀 **New Payment Received!**\n\n👤 **User ID:** {}\n💰 **Amount:** GHS {}\n✅ **Status:** {}\n🔗 **Reference:** `{}`".format(user_id, amount, status, reference)
-            # ✅ Log Event
-            print(f"✅ Payment Processed: {reference} | Amount: {amount} | Status: {status}")
 
-            return "Webhook processed successfully", 200
-        else:
-            return "Payment verification failed", 400
+    send_discord_message(admin_message)  # Ensure this function exists and is properly defined
+
+    # ✅ Log Event
+    print(f"✅ Payment Processed: {reference} | Amount: {amount} | Status: {status}")
+
+    return "Webhook processed successfully", 200
 
 @app.route("/", methods=["GET"])
 def home():
