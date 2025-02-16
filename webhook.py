@@ -1,47 +1,41 @@
-import os
-import json
-import sqlite3
-from flask import Flask, request
+from flask import Flask, request, jsonify
+from database import session, Order
+from config import PAYSTACK_SECRET_KEY
+import requests
 
-from dotenv import load_dotenv
-
-load_dotenv()
 app = Flask(__name__)
 
-PAYSTACK_SECRET_KEY = os.getenv("PAYSTACK_SECRET_KEY")
+PAYSTACK_VERIFY_URL = "https://api.paystack.co/transaction/verify/"
 
 def verify_paystack_payment(reference):
-    url = f"https://api.paystack.co/transaction/verify/{reference}"
     headers = {"Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"}
+    response = requests.get(f"{PAYSTACK_VERIFY_URL}{reference}", headers=headers)
+    return response.json()
 
-    response = requests.get(url, headers=headers).json()
-    if response.get("status") and response["data"]["status"] == "success":
-        return True, response["data"]["amount"] / 100, response["data"]["metadata"]
-    return False, 0, {}
-
-@app.route("/paystack_webhook", methods=["POST"])
+@app.route('/paystack-webhook', methods=['POST'])
 def paystack_webhook():
-    data = request.get_json()
-    if not data:
-        return "Invalid Data", 400
+    payload = request.get_json()
 
-    reference = data["data"].get("reference")
-    amount = data["data"].get("amount", 0) / 100
-    metadata = data["data"].get("metadata", {})
-    user_id = metadata.get("user_id", "unknown")
-    address = metadata.get("address", "")
-    phone = metadata.get("phone", "")
+    # Ensure it's a successful payment
+    if payload.get('event') == 'charge.success':
+        reference = payload['data']['reference']
+        user_id = payload['data']['metadata'].get('user_id')
+        product_id = payload['data']['metadata'].get('product_id')
 
-    verified, amount, metadata = verify_paystack_payment(reference)
-    if verified:
-        conn = sqlite3.connect("store.db")
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO orders (user_id, product_id, quantity, status, address, phone, reference) VALUES (?, ?, ?, 'paid', ?, ?, ?)", 
-                       (user_id, 1, 1, address, phone, reference))
-        conn.commit()
-        conn.close()
-        return "Webhook processed", 200
-    return "Verification failed", 400
+        # Verify payment status from Paystack
+        verify_response = verify_paystack_payment(reference)
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+        if verify_response.get('data') and verify_response['data']['status'] == 'success':
+            # Update order status
+            order = session.query(Order).filter_by(user_id=user_id, product_id=product_id).first()
+            if order:
+                order.status = 'paid'
+                session.commit()
+                return jsonify({"status": "success", "message": "Order updated"}), 200
+            else:
+                return jsonify({"status": "error", "message": "Order not found"}), 404
+
+    return jsonify({"status": "failed", "message": "Invalid event"}), 400
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
